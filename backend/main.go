@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
+	"monitoring-system/protocol"
 )
 
 func main() {
@@ -31,15 +32,17 @@ func main() {
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
 
-	buffer := make([]byte, 1024)
+
 
 	for {
-		n, err := conn.Read(buffer)
-		if err != nil {
-			fmt.Println("read error:", err)
-			return
+			msg, err := protocol.ReadMessage(conn)
+			if err != nil {
+				fmt.Println("read message error:", err)
+				return
+			}
+			fmt.Printf("received message: %+v\n", msg)
+
 		}
 
-		fmt.Printf("received: %s\n", string(buffer[:n]))
+
 	}
-}

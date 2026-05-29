@@ -41,12 +41,13 @@ func ReadMessage(r io.Reader)(Message, error){
 	var length uint32
 	var msg Message
 	//leer solo la longitud del mensaje
-	length:= make([]byte, 4)
-	_, err := io.ReadFull(r, length)//ler exactamente 4 bytes, que es el tamaño de uint32
+	header:= make([]byte, 4)
+	_, err := io.ReadFull(r, header)//ler exactamente 4 bytes, que es el tamaño de uint32
 	if err != nil {
 		return msg, err
 	}
-	payload:= make([]byte, binary.BigEndian.Uint32(length))
+	length = binary.BigEndian.Uint32(header)
+	payload:= make([]byte, length)
 	//crea un buffer del tamaño del mensaje, para leer el mensaje completo
 	_, err = io.ReadFull(r, payload)
 	if err != nil {
