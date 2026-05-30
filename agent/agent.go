@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"monitoring-system/protocol"
+
 )
 
 func main() {
@@ -18,14 +19,21 @@ func main() {
 	defer conn.Close()
 
 	for {
+		cpuUsage, ramUsage, err := collectMetrics()
+	if err != nil {
+		log.Println(err)
+		continue
+		}
 
 		msg := protocol.Message{
 			Type:      "heartbeat",
 			Hostname:  "agent-1",
 			Timestamp: time.Now().Unix(),
+			CPU:       cpuUsage,
+			RAM:       ramUsage,
 		}
 
-		err := protocol.WriteMessage(conn, msg)
+		err = protocol.WriteMessage(conn, msg)
 		if err != nil {
 			log.Println(err)
 			return
