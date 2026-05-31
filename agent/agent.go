@@ -20,6 +20,7 @@ func main() {
 	events := make(chan protocol.Event, 100)//buffer de eventos 
 	go collectMetrics(events)//recolectar un evento
 	go heartbeat(events)//recolectar un evento de latido
+	go collectProcess(events)//recolectar un evento de procesos
 	sender(conn, events)//mandar eventos indefinidamente
 	}
 
