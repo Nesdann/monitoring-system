@@ -21,6 +21,7 @@ func main() {
 	go collectMetrics(events)//recolectar un evento
 	go heartbeat(events)//recolectar un evento de latido
 	go collectProcess(events)//recolectar un evento de procesos
+	go collectConnections(events)//recolectar un evento de red
 	sender(conn, events)//mandar eventos indefinidamente
 	}
 
