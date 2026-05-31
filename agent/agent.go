@@ -3,10 +3,8 @@ package main
 import (
 	"log"
 	"net"
-	"time"
 
 	"monitoring-system/protocol"
-
 )
 
 func main() {
@@ -15,32 +13,22 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	println("Connected to backend at localhost:2277")
 	defer conn.Close()
 
-	for {
-		cpuUsage, ramUsage, err := collectMetrics()
-	if err != nil {
-		log.Println(err)
-		continue
-		}
 
-		msg := protocol.Message{
-			Type:      "heartbeat",
-			Hostname:  "agent-1",
-			Timestamp: time.Now().Unix(),
-			CPU:       cpuUsage,
-			RAM:       ramUsage,
-		}
-
-		err = protocol.WriteMessage(conn, msg)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
-		log.Println("heartbeat enviado")
-
-		time.Sleep(5 * time.Second)
+	events := make(chan protocol.Event, 100)//buffer de eventos 
+	go collectMetrics(events)//recolectar un evento
+	go heartbeat(events)//recolectar un evento de latido
+	sender(conn, events)//mandar eventos indefinidamente
 	}
+
+func sender(conn net.Conn, events <-chan protocol.Event) {
+    for event := range events {
+        err := protocol.WriteEvent(conn, event)
+        if err != nil {
+            log.Println("error sending event:", err)
+            return
+        }
+    }
 }

@@ -35,7 +35,7 @@ func handleConnection(conn net.Conn) {
 
 
 	for {
-			msg, err := protocol.ReadMessage(conn)
+			msg, err := protocol.ReadEvent(conn)
 			if err != nil {
 				fmt.Println("read message error:", err)
 				return

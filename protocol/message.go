@@ -7,3 +7,10 @@ type Message struct {
 	CPU       float64 `json:"cpu,omitempty"`
 	RAM       float64 `json:"ram,omitempty"`
 }
+
+type Event struct {
+    Type      string         `json:"type"`
+    Timestamp int64          `json:"timestamp"`
+    Hostname  string         `json:"hostname"`
+    Data      map[string]any `json:"data"`
+}

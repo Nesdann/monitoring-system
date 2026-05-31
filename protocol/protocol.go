@@ -6,7 +6,7 @@ import (
 	"io"
 )
 
-func WriteMessage(w io.Writer, msg Message) error {
+func WriteEvent(w io.Writer, msg Event) error {
 	//w io.writer es cualquier cosa donde pueda escribir, como un socket o un archivo
 
 	payload, err := json.Marshal(msg)//lo pasa a json, lo convierte a bytes
@@ -37,9 +37,9 @@ func WriteMessage(w io.Writer, msg Message) error {
 	return nil
 }
 
-func ReadMessage(r io.Reader)(Message, error){
+func ReadEvent(r io.Reader)(Event, error){
 	var length uint32
-	var msg Message
+	var msg Event
 	//leer solo la longitud del mensaje
 	header:= make([]byte, 4)
 	_, err := io.ReadFull(r, header)//ler exactamente 4 bytes, que es el tamaño de uint32
