@@ -10,7 +10,7 @@ func evaluateRules(event protocol.Event, state *AgentState) {
 	case "metrics":
 		ruleCPUSostenida(event, state)
 
-	case "process_snapshot":
+	case "process":
 		procs, ok := event.Data["processes"].([]any)
 		if !ok {
 			return

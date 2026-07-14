@@ -76,6 +76,7 @@ func handleEvent(db *sql.DB, event protocol.Event, store *StateStore) {
 		cpu := event.Data["cpu"]
 		ram := event.Data["ram"]
 		fmt.Printf("[metrics] %s  cpu=%.1f  ram=%.1f\n", event.Hostname, cpu, ram)
+		saveMetrics(db, event)
 
 	case "process":
 		procs, ok := event.Data["processes"].([]any)
