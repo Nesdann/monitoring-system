@@ -1,6 +1,7 @@
 use tokio_postgres::Client;
 use anyhow::Result;
 use crate::detectors::zscore::ZScoreDetector;
+use crate::detectors::moving_average::MovingAverageDetector;
 use crate::detectors::Detector;
 use crate::alerts::{Alert, save_alert};
 
@@ -43,5 +44,13 @@ pub async fn analyze_host(client: &Client, hostname: &str) -> Result<()> {
         save_alert(client, &alert).await?;
     }
     
+    let moving_avg_detector = MovingAverageDetector {
+        deviation_threshold: 0.3,
+        window_size: 10,
+    };
+    if let Some(alert) = moving_avg_detector.analyze(hostname, &samples) {
+        save_alert(client, &alert).await?;
+    }
+
     Ok(())
 }

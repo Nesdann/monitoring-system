@@ -18,3 +18,10 @@ pub fn z_score(current: f64, values: &[f64]) -> Option<f64> {
     }
     Some((current - avg) / sigma)
 }
+
+pub fn moving_average(values: &[f64]) -> Option<f64> {
+    if values.is_empty() {
+        return None;
+    }
+    Some(values.iter().sum::<f64>() / values.len() as f64)
+}

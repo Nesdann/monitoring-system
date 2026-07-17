@@ -8,6 +8,7 @@ use tokio::time::{sleep, Duration};
 use tokio_postgres::NoTls;
 use database::{get_hosts, analyze_host};
 
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let (client, connection) = tokio_postgres::connect(
