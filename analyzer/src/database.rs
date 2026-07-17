@@ -1,0 +1,47 @@
+use tokio_postgres::Client;
+use anyhow::Result;
+use crate::detectors::zscore::ZScoreDetector;
+use crate::detectors::Detector;
+use crate::alerts::{Alert, save_alert};
+
+pub async fn get_hosts(client: &Client) -> Result<Vec<String>> {
+    let rows = client
+        .query("SELECT DISTINCT hostname FROM metrics", &[])
+        .await?;
+
+    Ok(rows.into_iter().map(|row| row.get(0)).collect())
+}
+
+pub async fn get_cpu_samples(client: &Client, hostname: &str) -> Result<Vec<f64>> {
+    let rows = client
+        .query(
+            "
+            SELECT cpu
+            FROM metrics
+            WHERE hostname = $1
+            ORDER BY timestamp DESC
+            LIMIT 30
+            ",
+            &[&hostname],
+        )
+        .await?;
+
+    Ok(rows.into_iter().map(|row| row.get(0)).collect())
+}
+
+pub async fn analyze_host(client: &Client, hostname: &str) -> Result<()> {
+    println!("Analyzing host take samples: {}", hostname);
+    let samples = get_cpu_samples(client, hostname).await?;
+    
+    if samples.is_empty() {
+        println!("No samples for host: {}", hostname);
+        return Ok(());
+    }
+    
+    let detector = ZScoreDetector { threshold: 2.5 };
+    if let Some(alert) = detector.analyze(hostname, &samples) {
+        save_alert(client, &alert).await?;
+    }
+    
+    Ok(())
+}
