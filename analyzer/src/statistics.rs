@@ -31,3 +31,29 @@ pub fn ewma(values: &[f64], alpha: f64) -> Option<f64> {
     let first = *iter.next()?;
     Some(iter.fold(first, |acc, &x| alpha * x + (1.0 - alpha) * acc))
 }
+
+pub fn median(values: &[f64]) -> Option<f64> {
+    if values.is_empty() {
+        return None;
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let mid = sorted.len() / 2;
+    if sorted.len() % 2 == 0 {
+        Some((sorted[mid - 1] + sorted[mid]) / 2.0)
+    } else {
+        Some(sorted[mid])
+    }
+}
+
+pub fn mad_score(current: f64, values: &[f64]) -> Option<f64> {
+    let med = median(values)?;
+    let deviations: Vec<f64> = values.iter().map(|x| (x - med).abs()).collect();
+    let mad = median(&deviations)?;
+
+    if mad == 0.0 {
+        return None;
+    }
+
+    Some(0.6745 * (current - med) / mad)
+}

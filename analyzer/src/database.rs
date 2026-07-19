@@ -5,6 +5,7 @@ use crate::detectors::moving_average::MovingAverageDetector;
 use crate::detectors::Detector;
 use crate::alerts::{Alert, save_alert};
 use crate::detectors::ewma::EwmaDetector;
+use crate::detectors::mad::MadDetector;
 
 pub async fn get_hosts(client: &Client) -> Result<Vec<String>> {
     let rows = client
@@ -58,6 +59,13 @@ pub async fn analyze_host(client: &Client, hostname: &str) -> Result<()> {
         alpha: 0.5,
     };
     if let Some(alert) = ewma_detector.analyze(hostname, &samples) {
+        save_alert(client, &alert).await?;
+    }
+
+    let mad_detector = MadDetector {
+        threshold: 2.5,
+    };
+    if let Some(alert) = mad_detector.analyze(hostname, &samples) {
         save_alert(client, &alert).await?;
     }
 
