@@ -25,3 +25,9 @@ pub fn moving_average(values: &[f64]) -> Option<f64> {
     }
     Some(values.iter().sum::<f64>() / values.len() as f64)
 }
+
+pub fn ewma(values: &[f64], alpha: f64) -> Option<f64> {
+    let mut iter = values.iter().rev(); // oldest first
+    let first = *iter.next()?;
+    Some(iter.fold(first, |acc, &x| alpha * x + (1.0 - alpha) * acc))
+}

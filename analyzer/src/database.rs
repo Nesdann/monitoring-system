@@ -4,6 +4,7 @@ use crate::detectors::zscore::ZScoreDetector;
 use crate::detectors::moving_average::MovingAverageDetector;
 use crate::detectors::Detector;
 use crate::alerts::{Alert, save_alert};
+use crate::detectors::ewma::EwmaDetector;
 
 pub async fn get_hosts(client: &Client) -> Result<Vec<String>> {
     let rows = client
@@ -49,6 +50,14 @@ pub async fn analyze_host(client: &Client, hostname: &str) -> Result<()> {
         window_size: 10,
     };
     if let Some(alert) = moving_avg_detector.analyze(hostname, &samples) {
+        save_alert(client, &alert).await?;
+    }
+
+    let ewma_detector = EwmaDetector {
+        deviation_threshold: 0.3,
+        alpha: 0.5,
+    };
+    if let Some(alert) = ewma_detector.analyze(hostname, &samples) {
         save_alert(client, &alert).await?;
     }
 

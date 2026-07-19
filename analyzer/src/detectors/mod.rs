@@ -6,3 +6,4 @@ pub trait Detector {
 
 pub mod zscore;
 pub mod moving_average;
+pub mod ewma;
