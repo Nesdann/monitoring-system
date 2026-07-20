@@ -3,8 +3,9 @@ package main
 import "sync"
 
 type AgentState struct {
-	KnownProcesses map[string]bool // nombre → visto antes
-	RecentCPUs     []float64       // últimas N mediciones
+	KnownProcesses   map[string]bool // nombre → visto antes
+	KnownConnections map[string]bool
+	RecentCPUs       []float64 // últimas N mediciones
 }
 
 type StateStore struct {
@@ -23,8 +24,9 @@ func (s *StateStore) Get(hostname string) *AgentState {
 	defer s.mu.Unlock()
 	if _, ok := s.agents[hostname]; !ok {
 		s.agents[hostname] = &AgentState{
-			KnownProcesses: make(map[string]bool),
-			RecentCPUs:     []float64{},
+			KnownProcesses:   make(map[string]bool),
+			KnownConnections: make(map[string]bool),
+			RecentCPUs:       []float64{},
 		}
 	}
 	return s.agents[hostname]

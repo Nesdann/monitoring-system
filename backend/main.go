@@ -73,8 +73,8 @@ func handleEvent(db *sql.DB, event protocol.Event, store *StateStore) {
 		fmt.Printf("[heartbeat] %s\n", event.Hostname)
 
 	case "metrics":
-		cpu := event.Data["cpu"]
-		ram := event.Data["ram"]
+		cpu := toFloat(event.Data["cpu"])
+		ram := toFloat(event.Data["ram"])
 		fmt.Printf("[metrics] %s  cpu=%.1f  ram=%.1f\n", event.Hostname, cpu, ram)
 		saveMetrics(db, event)
 

@@ -35,6 +35,7 @@ func evaluateRules(event protocol.Event, state *AgentState) {
 				continue
 			}
 			ruleConexionPuertoRaro(event, conn)
+			ruleConexionNueva(event, conn, state)
 		}
 	}
 }
@@ -79,7 +80,12 @@ func ruleProcesoRootDesconocido(event protocol.Event, proc map[string]any, state
 		"ModemManager": true, "upowerd": true, "kerneloops": true,
 		"agetty": true, "docker-proxy": true, "psimon": true,
 	}
-	if !knownRoot[name] && !isKernelProcess(name) {
+	if knownRoot[name] || isKernelProcess(name) {
+		return
+	}
+	key := "root:" + name
+	if !state.KnownProcesses[key] {
+		state.KnownProcesses[key] = true
 		fmt.Printf("[ALERTA] %s  proceso root desconocido: %s (pid %v)\n",
 			event.Hostname, name, proc["pid"])
 	}
@@ -135,4 +141,21 @@ func isKernelProcess(name string) bool {
 		}
 	}
 	return false
+}
+
+func ruleConexionNueva(event protocol.Event, conn map[string]any, state *AgentState) {
+	dstIP, _ := conn["dst_ip"].(string)
+	dstPort := toFloat(conn["dst_port"])
+	status, _ := conn["status"].(string)
+
+	if dstIP == "" || status != "ESTABLISHED" {
+		return
+	}
+
+	key := fmt.Sprintf("%s:%v", dstIP, dstPort)
+	if !state.KnownConnections[key] {
+		state.KnownConnections[key] = true
+		fmt.Printf("[ALERTA] %s  conexion nueva: %s (pid %v)\n",
+			event.Hostname, key, conn["pid"])
+	}
 }
