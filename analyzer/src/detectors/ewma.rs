@@ -23,10 +23,12 @@ impl Detector for EwmaDetector{
                 hostname: hostname.to_string(),
                 detector: "ewma".to_string(),
                 severity: "warning".to_string(),
+
                 message: format!(
                     "current={:.2}, ewma={:.2}, deviation={:.0}%",
                     current, baseline, deviation * 100.0
                 ),
+                category: String::new(),
             })
         } else {
             None

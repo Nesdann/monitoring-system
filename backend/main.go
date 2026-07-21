@@ -26,6 +26,11 @@ func main() {
 		log.Fatal("postgres no responde:", err)
 	}
 	fmt.Println("conectado a postgres")
+	// crea las tablas si no existen, para que el usuario no tenga que hacerlo a mano
+	if err := runMigrations(db); err != nil {
+		log.Fatal("error running migrations:", err)
+	}
+	fmt.Println("migrations OK")
 
 	listener, err := net.Listen("tcp", ":2277")
 	if err != nil {
@@ -116,4 +121,57 @@ func handleEvent(db *sql.DB, event protocol.Event, store *StateStore) {
 		}
 		fmt.Printf("[connections] %s  guardadas=%d\n", event.Hostname, saved)
 	}
+}
+
+// runMigrations creates every table this system needs, if it doesn't exist yet.
+// Safe to run on every startup — CREATE TABLE IF NOT EXISTS is a no-op when the table is already there.
+func runMigrations(db *sql.DB) error {
+	statements := []string{
+		`CREATE TABLE IF NOT EXISTS metrics (
+			id SERIAL PRIMARY KEY,
+			timestamp BIGINT NOT NULL,
+			hostname TEXT NOT NULL,
+			cpu DOUBLE PRECISION NOT NULL,
+			ram DOUBLE PRECISION NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS processes (
+			id SERIAL PRIMARY KEY,
+			timestamp BIGINT NOT NULL,
+			hostname TEXT NOT NULL,
+			pid INTEGER NOT NULL,
+			name TEXT NOT NULL,
+			username TEXT NOT NULL,
+			cpu DOUBLE PRECISION NOT NULL,
+			mem DOUBLE PRECISION NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS connections (
+			id SERIAL PRIMARY KEY,
+			timestamp BIGINT NOT NULL,
+			hostname TEXT NOT NULL,
+			pid INTEGER NOT NULL,
+			src_ip TEXT NOT NULL,
+			src_port INTEGER NOT NULL,
+			dst_ip TEXT NOT NULL,
+			dst_port INTEGER NOT NULL,
+			protocol INTEGER NOT NULL,
+			status TEXT NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS alerts (
+			id SERIAL PRIMARY KEY,
+			timestamp BIGINT NOT NULL,
+			hostname TEXT NOT NULL,
+			detector TEXT NOT NULL,
+			severity TEXT NOT NULL,
+			message TEXT NOT NULL,
+			category TEXT NOT NULL DEFAULT 'uncategorized'
+		)`,
+		`ALTER TABLE alerts ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'uncategorized'`,
+	}
+
+	for _, stmt := range statements {
+		if _, err := db.Exec(stmt); err != nil {
+			return fmt.Errorf("migration failed: %w", err)
+		}
+	}
+	return nil
 }

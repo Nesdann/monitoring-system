@@ -17,6 +17,7 @@ impl Detector for MadDetector {
                 detector: "mad".to_string(),
                 severity: "warning".to_string(),
                 message: format!("current={:.2}, mad_score={:.2}", current, score),
+                category: String::new(),
             })
         } else {
             None

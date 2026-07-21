@@ -17,6 +17,7 @@ impl Detector for ZScoreDetector {
                 detector: "zscore".to_string(),
                 severity: "critical".to_string(),
                 message: format!("z={:.2}, current={:.2}", z, current),
+                category: String::new(),
             })
         } else {
             println!("No alert for host: {}, z={:.2}, current={:.2}", hostname, z, current);

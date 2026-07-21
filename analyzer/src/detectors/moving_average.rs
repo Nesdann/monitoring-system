@@ -28,6 +28,7 @@ impl Detector for MovingAverageDetector{
                     "current={:.2}, moving_avg={:.2}, deviation={:.0}%",
                     current, avg, deviation * 100.0
                 ),
+                category: String::new(),
             })
         } else {
             None

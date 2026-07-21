@@ -6,7 +6,7 @@ mod detectors;
 use anyhow::Result;
 use tokio::time::{sleep, Duration};
 use tokio_postgres::NoTls;
-use database::{get_hosts, analyze_host};
+use database::{get_hosts, analyze_host, analyze_processes};
 
 
 #[tokio::main]
@@ -31,9 +31,13 @@ async fn main() -> Result<()> {
 
                 for hostname in hosts {
                     if let Err(e) = analyze_host(&client, &hostname).await {
-                        eprintln!("Error analyzing {}: {}", hostname, e);
+                         eprintln!("Error analyzing {}: {:?}", hostname, e);
                     }
+                    if let Err(e) = analyze_processes(&client, &hostname).await {
+                          eprintln!("Error analyzing processes {}: {:?}", hostname, e);
+                      }
                 }
+                   
             }
             Err(e) => eprintln!("Error fetching hosts: {}", e),
         }
