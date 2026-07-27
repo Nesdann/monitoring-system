@@ -30,6 +30,7 @@ func main() {
 	if err := runMigrations(db); err != nil {
 		log.Fatal("error running migrations:", err)
 	}
+	go startAPIServer(db)
 	fmt.Println("migrations OK")
 
 	listener, err := net.Listen("tcp", ":2277")
@@ -134,6 +135,11 @@ func runMigrations(db *sql.DB) error {
 			cpu DOUBLE PRECISION NOT NULL,
 			ram DOUBLE PRECISION NOT NULL
 		)`,
+		`CREATE TABLE IF NOT EXISTS host_risk (
+			hostname TEXT PRIMARY KEY,
+			score DOUBLE PRECISION NOT NULL,
+			updated_at BIGINT NOT NULL
+		)`,
 		`CREATE TABLE IF NOT EXISTS processes (
 			id SERIAL PRIMARY KEY,
 			timestamp BIGINT NOT NULL,
@@ -166,6 +172,13 @@ func runMigrations(db *sql.DB) error {
 			category TEXT NOT NULL DEFAULT 'uncategorized'
 		)`,
 		`ALTER TABLE alerts ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'uncategorized'`,
+		`ALTER TABLE processes ADD COLUMN IF NOT EXISTS ppid INTEGER NOT NULL DEFAULT -1`,
+		`ALTER TABLE processes ADD COLUMN IF NOT EXISTS exe TEXT NOT NULL DEFAULT 'unknown'`,
+		`ALTER TABLE processes ADD COLUMN IF NOT EXISTS create_time BIGINT NOT NULL DEFAULT 0`,
+		`ALTER TABLE processes ADD COLUMN IF NOT EXISTS num_fds INTEGER NOT NULL DEFAULT -1`,
+		`ALTER TABLE connections ADD COLUMN IF NOT EXISTS process_name TEXT NOT NULL DEFAULT 'unknown'`,
+		`ALTER TABLE alerts ADD COLUMN IF NOT EXISTS occurrence_count INTEGER NOT NULL DEFAULT 1`,
+		`ALTER TABLE alerts ADD COLUMN IF NOT EXISTS last_seen BIGINT`,
 	}
 
 	for _, stmt := range statements {

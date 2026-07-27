@@ -1,6 +1,7 @@
 use super::Detector;
 use crate::alerts::Alert;
 use crate::statistics::moving_average;
+use crate::severity::severity_from_ratio;
 
 pub struct MovingAverageDetector{
     pub deviation_threshold: f64,
@@ -20,10 +21,11 @@ impl Detector for MovingAverageDetector{
         let deviation = (current - avg).abs() / avg;
         println!("No alert for host: {}, current={:.2}, moving_avg={:.2}, deviation={:.0}%", hostname, current, avg, deviation * 100.0);
         if deviation > self.deviation_threshold {
+            let ratio = deviation / self.deviation_threshold;
             Some(Alert {
                 hostname: hostname.to_string(),
                 detector: "moving_average".to_string(),
-                severity: "warning".to_string(),
+                severity: severity_from_ratio(ratio),
                 message: format!(
                     "current={:.2}, moving_avg={:.2}, deviation={:.0}%",
                     current, avg, deviation * 100.0

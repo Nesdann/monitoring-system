@@ -9,6 +9,7 @@ import (
 func saveConnection(db *sql.DB, event protocol.Event, conn map[string]any) {
 	pid := int(toFloat(conn["pid"]))
 	srcIP, _ := conn["src_ip"].(string)
+	processName, _ := conn["process_name"].(string)
 	srcPort := int(toFloat(conn["src_port"]))
 	dstIP, _ := conn["dst_ip"].(string)
 	dstPort := int(toFloat(conn["dst_port"]))
@@ -16,9 +17,9 @@ func saveConnection(db *sql.DB, event protocol.Event, conn map[string]any) {
 	status, _ := conn["status"].(string)
 
 	_, err := db.Exec(`
-        INSERT INTO connections (timestamp, hostname, pid, src_ip, src_port, dst_ip, dst_port, protocol, status)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-		event.Timestamp, event.Hostname, pid, srcIP, srcPort, dstIP, dstPort, proto, status,
+        INSERT INTO connections (timestamp, hostname, pid, process_name, src_ip, src_port, dst_ip, dst_port, protocol, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		event.Timestamp, event.Hostname, pid, processName, srcIP, srcPort, dstIP, dstPort, proto, status,
 	)
 	if err != nil {
 		fmt.Println("error guardando conexion:", err)
@@ -31,11 +32,15 @@ func saveProcess(db *sql.DB, event protocol.Event, proc map[string]any) {
 	username, _ := proc["user"].(string)
 	cpu := toFloat(proc["cpu"])
 	mem := toFloat(proc["mem"])
+	ppid := int(toFloat(proc["ppid"]))
+	exe, _ := proc["exe"].(string)
+	createTime := int64(toFloat(proc["create_time"]))
+	numFds := int(toFloat(proc["num_fds"]))
 
 	_, err := db.Exec(`
-        INSERT INTO processes (timestamp, hostname, pid, name, username, cpu, mem)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-		event.Timestamp, event.Hostname, pid, name, username, cpu, mem,
+        INSERT INTO processes (timestamp, hostname, pid, name, username, cpu, mem, ppid, exe, create_time, num_fds)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		event.Timestamp, event.Hostname, pid, name, username, cpu, mem, ppid, exe, createTime, numFds,
 	)
 	if err != nil {
 		fmt.Println("error guardando proceso:", err)

@@ -108,20 +108,22 @@ func ruleConexionPuertoRaro(event protocol.Event, conn map[string]any) {
 	dstIP, _ := conn["dst_ip"].(string)
 	srcIP, _ := conn["src_ip"].(string)
 	status, _ := conn["status"].(string)
+	protoType := toFloat(conn["protocol"]) // NEW
 
 	if dstIP == "" || dstIP == "0.0.0.0" || dstIP == "::" {
 		return
 	}
-	if status != "ESTABLISHED" {
+
+	isUDP := protoType == 2
+	if !isUDP && status != "ESTABLISHED" {
 		return
 	}
-	// ignorar tráfico interno localhost
 	if dstIP == "127.0.0.1" && srcIP == "127.0.0.1" {
 		return
 	}
 
 	knownPorts := map[float64]bool{
-		80: true, 443: true, 53: true, 22: true,
+		80: true, 443: true, 53: true, 22: true, 67: true, 68: true,
 	}
 	if !knownPorts[dstPort] {
 		fmt.Printf("[ALERTA] %s  conexion a puerto raro: %s:%v (pid %v)\n",
@@ -147,8 +149,10 @@ func ruleConexionNueva(event protocol.Event, conn map[string]any, state *AgentSt
 	dstIP, _ := conn["dst_ip"].(string)
 	dstPort := toFloat(conn["dst_port"])
 	status, _ := conn["status"].(string)
+	protoType := toFloat(conn["protocol"]) // NEW
 
-	if dstIP == "" || status != "ESTABLISHED" {
+	isUDP := protoType == 2 // NEW
+	if dstIP == "" || (!isUDP && status != "ESTABLISHED") {
 		return
 	}
 

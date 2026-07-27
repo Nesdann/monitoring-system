@@ -1,12 +1,14 @@
 mod database;
 mod statistics;
 mod alerts;
+mod severity;
 mod detectors;
 
 use anyhow::Result;
 use tokio::time::{sleep, Duration};
 use tokio_postgres::NoTls;
-use database::{get_hosts, analyze_host, analyze_processes};
+use database::{get_hosts, analyze_host, analyze_processes, analyze_process_relationships, compute_risk_score, analyze_combination};
+
 
 
 #[tokio::main]
@@ -36,6 +38,16 @@ async fn main() -> Result<()> {
                     if let Err(e) = analyze_processes(&client, &hostname).await {
                           eprintln!("Error analyzing processes {}: {:?}", hostname, e);
                       }
+                    if let Err(e) = analyze_process_relationships(&client, &hostname).await {
+                         eprintln!("Error analyzing process relationships {}: {:?}", hostname, e);
+                            }
+                    if let Err(e) = analyze_combination(&client, &hostname).await {
+                        eprintln!("Error analyzing combination {}: {:?}", hostname, e);
+                    }
+                    if let Err(e) = compute_risk_score(&client, &hostname).await {
+                        eprintln!("Error computing risk score {}: {:?}", hostname, e);
+                    }
+                    
                 }
                    
             }

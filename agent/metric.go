@@ -4,11 +4,12 @@ import (
 	"log"
 	"time"
 
+	"monitoring-system/protocol"
+
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/mem"
-	"github.com/shirou/gopsutil/v4/process"
-	"monitoring-system/protocol"
 	"github.com/shirou/gopsutil/v4/net"
+	"github.com/shirou/gopsutil/v4/process"
 )
 
 func collectMetrics(events chan<- protocol.Event) {
@@ -85,12 +86,36 @@ func collectProcess(events chan<- protocol.Event) {
 				memPercent = 0.0
 			}
 
+			ppid, err := proc.Ppid()
+			if err != nil {
+				ppid = -1
+			}
+
+			exe, err := proc.Exe()
+			if err != nil {
+				exe = "unknown"
+			}
+
+			createTime, err := proc.CreateTime()
+			if err != nil {
+				createTime = 0
+			}
+
+			numFds, err := proc.NumFDs()
+			if err != nil {
+				numFds = -1
+			}
+
 			pinfo := map[string]any{
-				"name": name,
-				"pid":  pid,
-				"user": user,
-				"cpu":  cpuPercent,
-				"mem":  memPercent,
+				"name":        name,
+				"pid":         pid,
+				"user":        user,
+				"cpu":         cpuPercent,
+				"mem":         memPercent,
+				"ppid":        ppid,
+				"exe":         exe,
+				"create_time": createTime,
+				"num_fds":     numFds,
 			}
 
 			data = append(data, pinfo)
@@ -108,23 +133,37 @@ func collectProcess(events chan<- protocol.Event) {
 
 }
 func collectConnections(events chan<- protocol.Event) {
-    for {
-        conns, err := net.Connections("inet")
-        if err != nil {
-            log.Println("connections error:", err)
-            time.Sleep(20 * time.Second)
-            continue
-        }
+	for {
+		conns, err := net.Connections("inet")
+		if err != nil {
+			log.Println("connections error:", err)
+			time.Sleep(20 * time.Second)
+			continue
+		}
 
-        data := make([]map[string]any, 0, len(conns))
+		data := make([]map[string]any, 0, len(conns))
 		for _, conn := range conns {
 			if conn.Raddr.IP == "" {
-            continue // skip sockets en LISTEN sin destino
-            }
+				continue // skip sockets en LISTEN sin destino
+			}
 			pid := conn.Pid
 			if pid == 0 {
 				pid = -1
 			}
+
+			procName := "unknown"
+			if pid > 0 {
+				if p, err := process.NewProcess(pid); err == nil {
+					if n, err := p.Name(); err == nil {
+						procName = n
+					} else {
+						log.Println("process_name lookup failed for pid", pid, ":", err)
+					}
+				} else {
+					log.Println("NewProcess failed for pid", pid, ":", err)
+				}
+			}
+
 			srcIP := conn.Laddr.IP
 			if srcIP == "" {
 				srcIP = "unknown"
@@ -141,23 +180,24 @@ func collectConnections(events chan<- protocol.Event) {
 				status = "unknown"
 			}
 			data = append(data, map[string]any{
-				"pid":       pid,
-				"src_ip":    srcIP,
-				"src_port":  srcPort,
-				"dst_ip":    dstIP,
-				"dst_port":  dstPort,
-				"protocol":  protoType,
-				"status":    status,
+				"pid":          pid,
+				"process_name": procName,
+				"src_ip":       srcIP,
+				"src_port":     srcPort,
+				"dst_ip":       dstIP,
+				"dst_port":     dstPort,
+				"protocol":     protoType,
+				"status":       status,
 			})
 		}
 
-        events <- protocol.Event{
-            Type:      "connection_snapshot",
-            Hostname:  "agent-1",
-            Timestamp: time.Now().Unix(),
-            Data:      map[string]any{"connections": data},
-        }
+		events <- protocol.Event{
+			Type:      "connection_snapshot",
+			Hostname:  "agent-1",
+			Timestamp: time.Now().Unix(),
+			Data:      map[string]any{"connections": data},
+		}
 
-        time.Sleep(20 * time.Second)
-    }
+		time.Sleep(20 * time.Second)
+	}
 }
