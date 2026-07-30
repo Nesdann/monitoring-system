@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Endpoint Monitor</title>
+<style>
+  :root {
+    --bg: #0c1013;
+    --panel: #12171b;
+    --panel-border: #232b31;
+    --text: #d8e0e6;
+    --muted: #6b7a85;
+    --mono: "JetBrains Mono", "SF Mono", Consolas, monospace;
+    --sans: -apple-system, "Segoe UI", Inter, sans-serif;
+
+    --ok: #4fd1c5;
+    --warn: #e8a33d;
+    --high: #ef8354;
+    --critical: #e0526b;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  header {
+    padding: 20px 28px;
+    border-bottom: 1px solid var(--panel-border);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  h1 {
+    font-size: 20px;
+    margin: 2px 0 0 0;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  #status {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  main {
+    padding: 24px 28px 60px;
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+
+  section { margin-bottom: 34px; }
+
+  .section-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  /* ---- host cards / gauges ---- */
+  #hosts {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 14px;
+  }
+
+  .host-card {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 16px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .host-card:hover { border-color: #37424a; transform: translateY(-1px); }
+  .host-card.selected { border-color: var(--ok); }
+
+  .gauge {
+    width: 52px; height: 52px; border-radius: 50%;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .gauge::before {
+    content: "";
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    background: conic-gradient(var(--gauge-color, var(--ok)) calc(var(--pct, 0) * 1%), #1c2328 0);
+    mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+  }
+  .gauge span {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    z-index: 1;
+  }
+
+  .host-meta .hostname {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .host-meta .risk-label {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  /* ---- alerts table ---- */
+  .filters {
+    display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;
+  }
+  .filters select, .filters button {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 6px;
+  }
+  .filters button {
+    cursor: pointer;
+    color: var(--muted);
+  }
+  .filters button.active {
+    color: var(--text);
+    border-color: var(--ok);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    overflow: hidden;
+    font-size: 13px;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--panel-border);
+  }
+  th {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  tr:last-child td { border-bottom: none; }
+  td.time, td.host { font-family: var(--mono); color: var(--muted); white-space: nowrap; }
+  td.count { font-family: var(--mono); text-align: right; }
+
+  .badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+  .badge.warning   { background: rgba(232,163,61,0.15); color: var(--warn); }
+  .badge.high      { background: rgba(239,131,84,0.15); color: var(--high); }
+  .badge.critical  { background: rgba(224,82,107,0.15); color: var(--critical); }
+
+  .empty {
+    padding: 30px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  /* ---- detail grid ---- */
+  #detail { display: none; }
+  #detail.visible { display: block; }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 800px) { .detail-grid { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .panel h3 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 10px 0;
+    font-weight: 500;
+  }
+  .metric-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: var(--mono);
+    padding: 6px 0;
+    border-bottom: 1px solid var(--panel-border);
+    font-size: 13px;
+  }
+  .metric-row:last-child { border-bottom: none; }
+  .metric-row .val { color: var(--ok); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="eyebrow">Fleet console</div>
+    <h1>Endpoint Monitor</h1>
+  </div>
+  <div id="status">connecting…</div>
+</header>
+
+<main>
+  <section>
+    <div class="section-title">Hosts</div>
+    <div id="hosts"></div>
+  </section>
+
+  <section id="detail">
+    <div class="section-title" id="detail-title">Host detail</div>
+    <div class="detail-grid">
+      <div class="panel">
+        <h3>Latest metrics</h3>
+        <div id="metrics-panel"></div>
+      </div>
+      <div class="panel">
+        <h3>Top processes (cpu)</h3>
+        <div id="processes-panel"></div>
+      </div>
+      <div class="panel">
+        <h3>Active connections</h3>
+        <div id="connections-panel"></div>
+      </div>
+      <div class="panel">
+        <h3>Risk breakdown</h3>
+        <div id="risk-panel"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-title">Alerts</div>
+    <div class="filters">
+      <button data-severity="" class="active">all severities</button>
+      <button data-severity="critical">critical</button>
+      <button data-severity="high">high</button>
+      <button data-severity="warning">warning</button>
+      <button id="clear-host" style="margin-left:auto; display:none;">clear host filter ✕</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Last seen</th>
+          <th>Host</th>
+          <th>Severity</th>
+          <th>Category</th>
+          <th>Message</th>
+          <th style="text-align:right;">×</th>
+        </tr>
+      </thead>
+      <tbody id="alerts-body">
+        <tr><td colspan="6" class="empty">Loading…</td></tr>
+      </tbody>
+    </table>
+  </section>
+</main>
+
+<script>
+  // ---- config ----
+  // NOTE: this key is visible to anyone who loads this page. Fine for a local,
+  // single-operator console; do NOT deploy this as-is anywhere multi-user or
+  // internet-facing without moving auth server-side.
+  const API_KEY = "ddf7ae846ccf4583376fca84591724f67adc1857709bcbf149577b9e2c4c412a";
+  const REFRESH_MS = 15000;
+
+  let selectedHost = null;
+  let severityFilter = "";
+
+  async function apiFetch(path) {
+    const res = await fetch(path, { headers: { "X-API-Key": API_KEY } });
+    if (!res.ok) throw new Error(`${path} -> ${res.status}`);
+    return res.json();
+  }
+
+  function riskBucket(score) {
+    if (score >= 20) return { label: "critical", color: "var(--critical)" };
+    if (score >= 10) return { label: "high", color: "var(--high)" };
+    if (score >= 3)  return { label: "elevated", color: "var(--warn)" };
+    return { label: "nominal", color: "var(--ok)" };
+  }
+
+  function renderHosts(risks) {
+    const el = document.getElementById("hosts");
+    el.innerHTML = "";
+    risks.forEach(r => {
+      const bucket = riskBucket(r.score);
+      const pct = Math.min(100, (r.score / 25) * 100);
+
+      const card = document.createElement("div");
+      card.className = "host-card" + (selectedHost === r.hostname ? " selected" : "");
+      card.innerHTML = `
+        <div class="gauge" style="--pct:${pct}; --gauge-color:${bucket.color}">
+          <span>${r.score.toFixed(0)}</span>
+        </div>
+        <div class="host-meta">
+          <div class="hostname">${r.hostname}</div>
+          <div class="risk-label" style="color:${bucket.color}">${bucket.label}</div>
+        </div>`;
+      card.onclick = () => selectHost(r.hostname);
+      el.appendChild(card);
+    });
+  }
+
+  function selectHost(hostname) {
+    selectedHost = hostname;
+    document.getElementById("detail").classList.add("visible");
+    document.getElementById("detail-title").textContent = `Host detail — ${hostname}`;
+    document.getElementById("clear-host").style.display = "inline-block";
+    loadDetail(hostname);
+    loadAlerts();
+    refreshHostSelection();
+  }
+
+  function refreshHostSelection() {
+    document.querySelectorAll(".host-card").forEach(c => c.classList.remove("selected"));
+    if (selectedHost) {
+      [...document.querySelectorAll(".host-card")].forEach(c => {
+        if (c.querySelector(".hostname").textContent === selectedHost) c.classList.add("selected");
+      });
+    }
+  }
+
+  async function loadDetail(hostname) {
+    try {
+      const [metrics, processes, connections] = await Promise.all([
+        apiFetch(`/metrics?hostname=${hostname}&limit=1`),
+        apiFetch(`/processes?hostname=${hostname}&limit=200`),
+        apiFetch(`/connections?hostname=${hostname}&status=ESTABLISHED&limit=8`),
+      ]);
+
+      const m = metrics[0];
+      document.getElementById("metrics-panel").innerHTML = m
+        ? `<div class="metric-row"><span>CPU</span><span class="val">${m.cpu.toFixed(1)}%</span></div>
+           <div class="metric-row"><span>RAM</span><span class="val">${m.ram.toFixed(1)}%</span></div>
+           <div class="metric-row"><span>Last sample</span><span class="val">${new Date(m.timestamp * 1000).toLocaleTimeString()}</span></div>`
+        : `<div class="empty">No metrics yet</div>`;
+
+      const topProcs = [...processes].sort((a, b) => b.cpu - a.cpu).slice(0, 6);
+      document.getElementById("processes-panel").innerHTML = topProcs.length
+        ? topProcs.map(p => `<div class="metric-row"><span>${p.name}</span><span class="val">${p.cpu.toFixed(1)}%</span></div>`).join("")
+        : `<div class="empty">No process data</div>`;
+
+      document.getElementById("connections-panel").innerHTML = connections.length
+        ? connections.map(c => `<div class="metric-row"><span>${c.process_name} → ${c.dst_ip}:${c.dst_port}</span><span class="val">${c.status}</span></div>`).join("")
+        : `<div class="empty">No active connections</div>`;
+
+      document.getElementById("risk-panel").innerHTML =
+        `<div class="metric-row"><span>Window</span><span class="val">15 min</span></div>
+         <div class="metric-row"><span>Scoring</span><span class="val">severity-weighted</span></div>`;
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function loadAlerts() {
+    const tbody = document.getElementById("alerts-body");
+    try {
+      let url = `/alerts?limit=30`;
+      if (selectedHost) url += `&hostname=${selectedHost}`;
+      if (severityFilter) url += `&severity=${severityFilter}`;
+
+      const alerts = await apiFetch(url);
+      if (!alerts.length) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty">No alerts match this filter</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = alerts.map(a => `
+        <tr>
+          <td class="time">${new Date(a.last_seen * 1000).toLocaleTimeString()}</td>
+          <td class="host">${a.hostname}</td>
+          <td><span class="badge ${a.severity}">${a.severity}</span></td>
+          <td>${a.category}</td>
+          <td>${a.message}</td>
+          <td class="count">${a.occurrence_count}</td>
+        </tr>`).join("");
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="6" class="empty">Failed to load alerts — check API key and backend status</td></tr>`;
+    }
+  }
+
+  async function refreshAll() {
+    try {
+      const risks = await apiFetch(`/risk`);
+      renderHosts(risks);
+      await loadAlerts();
+      if (selectedHost) await loadDetail(selectedHost);
+      document.getElementById("status").textContent = `live · updated ${new Date().toLocaleTimeString()}`;
+    } catch (e) {
+      document.getElementById("status").textContent = `connection error — is the backend running?`;
+    }
+  }
+
+  document.querySelectorAll(".filters button[data-severity]").forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll(".filters button[data-severity]").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      severityFilter = btn.dataset.severity;
+      loadAlerts();
+    };
+  });
+
+  document.getElementById("clear-host").onclick = () => {
+    selectedHost = null;
+    document.getElementById("detail").classList.remove("visible");
+    document.getElementById("clear-host").style.display = "none";
+    refreshHostSelection();
+    loadAlerts();
+  };
+
+  refreshAll();
+  setInterval(refreshAll, REFRESH_MS);
+</script>
+</body>
+</html>

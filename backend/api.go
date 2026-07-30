@@ -10,10 +10,15 @@ import (
 func startAPIServer(db *sql.DB) {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/hosts", handleHosts(db))
-	mux.HandleFunc("/alerts", handleAlerts(db))
-	mux.HandleFunc("/risk", handleRisk(db))
-	mux.HandleFunc("/metrics", handleMetrics(db))
+	mux.HandleFunc("/hosts", requireRole(db, "viewer", handleHosts(db)))
+	mux.HandleFunc("/alerts", requireRole(db, "viewer", handleAlerts(db)))
+	mux.HandleFunc("/risk", requireRole(db, "viewer", handleRisk(db)))
+	mux.HandleFunc("/metrics", requireRole(db, "viewer", handleMetrics(db)))
+	mux.HandleFunc("/processes", requireRole(db, "admin", handleProcesses(db)))
+	mux.HandleFunc("/connections", requireRole(db, "admin", handleConnections(db)))
+	mux.HandleFunc("/dashboard", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./dashboard.html")
+	})
 
 	println("API listening on :8081")
 	if err := http.ListenAndServe(":8081", mux); err != nil {
@@ -192,6 +197,155 @@ func handleMetrics(db *sql.DB) http.HandlerFunc {
 			var m Metric
 			rows.Scan(&m.Timestamp, &m.CPU, &m.RAM)
 			results = append(results, m)
+		}
+		writeJSON(w, results)
+	}
+}
+
+// GET /processes?hostname=&name=&since=&limit=&offset=
+func handleProcesses(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+
+		hostname := q.Get("hostname")
+		name := q.Get("name")
+		since := parseIntDefault(q.Get("since"), 0)
+		limit := parseIntDefault(q.Get("limit"), 50)
+		offset := parseIntDefault(q.Get("offset"), 0)
+		if limit > 200 {
+			limit = 200
+		}
+
+		query := `SELECT timestamp, hostname, pid, name, username, cpu, mem, ppid, exe, create_time, num_fds
+                  FROM processes WHERE 1=1`
+		args := []any{}
+		argN := 1
+
+		if hostname != "" {
+			query += " AND hostname = $" + strconv.Itoa(argN)
+			args = append(args, hostname)
+			argN++
+		}
+		if name != "" {
+			query += " AND name = $" + strconv.Itoa(argN)
+			args = append(args, name)
+			argN++
+		}
+		if since > 0 {
+			query += " AND timestamp >= $" + strconv.Itoa(argN)
+			args = append(args, since)
+			argN++
+		}
+
+		query += " ORDER BY timestamp DESC LIMIT $" + strconv.Itoa(argN) + " OFFSET $" + strconv.Itoa(argN+1)
+		args = append(args, limit, offset)
+
+		rows, err := db.Query(query, args...)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		type Process struct {
+			Timestamp  int64   `json:"timestamp"`
+			Hostname   string  `json:"hostname"`
+			PID        int     `json:"pid"`
+			Name       string  `json:"name"`
+			Username   string  `json:"username"`
+			CPU        float64 `json:"cpu"`
+			Mem        float64 `json:"mem"`
+			PPID       int     `json:"ppid"`
+			Exe        string  `json:"exe"`
+			CreateTime int64   `json:"create_time"`
+			NumFDs     int     `json:"num_fds"`
+		}
+
+		var results []Process
+		for rows.Next() {
+			var p Process
+			if err := rows.Scan(&p.Timestamp, &p.Hostname, &p.PID, &p.Name, &p.Username, &p.CPU, &p.Mem, &p.PPID, &p.Exe, &p.CreateTime, &p.NumFDs); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			results = append(results, p)
+		}
+		writeJSON(w, results)
+	}
+}
+
+// GET /connections?hostname=&status=&dst_ip=&since=&limit=&offset=
+func handleConnections(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+
+		hostname := q.Get("hostname")
+		status := q.Get("status")
+		dstIP := q.Get("dst_ip")
+		since := parseIntDefault(q.Get("since"), 0)
+		limit := parseIntDefault(q.Get("limit"), 50)
+		offset := parseIntDefault(q.Get("offset"), 0)
+		if limit > 200 {
+			limit = 200
+		}
+
+		query := `SELECT timestamp, hostname, pid, process_name, src_ip, src_port, dst_ip, dst_port, protocol, status
+                  FROM connections WHERE 1=1`
+		args := []any{}
+		argN := 1
+
+		if hostname != "" {
+			query += " AND hostname = $" + strconv.Itoa(argN)
+			args = append(args, hostname)
+			argN++
+		}
+		if status != "" {
+			query += " AND status = $" + strconv.Itoa(argN)
+			args = append(args, status)
+			argN++
+		}
+		if dstIP != "" {
+			query += " AND dst_ip = $" + strconv.Itoa(argN)
+			args = append(args, dstIP)
+			argN++
+		}
+		if since > 0 {
+			query += " AND timestamp >= $" + strconv.Itoa(argN)
+			args = append(args, since)
+			argN++
+		}
+
+		query += " ORDER BY timestamp DESC LIMIT $" + strconv.Itoa(argN) + " OFFSET $" + strconv.Itoa(argN+1)
+		args = append(args, limit, offset)
+
+		rows, err := db.Query(query, args...)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		type Connection struct {
+			Timestamp   int64  `json:"timestamp"`
+			Hostname    string `json:"hostname"`
+			PID         int    `json:"pid"`
+			ProcessName string `json:"process_name"`
+			SrcIP       string `json:"src_ip"`
+			SrcPort     int    `json:"src_port"`
+			DstIP       string `json:"dst_ip"`
+			DstPort     int    `json:"dst_port"`
+			Protocol    int    `json:"protocol"`
+			Status      string `json:"status"`
+		}
+
+		var results []Connection
+		for rows.Next() {
+			var c Connection
+			if err := rows.Scan(&c.Timestamp, &c.Hostname, &c.PID, &c.ProcessName, &c.SrcIP, &c.SrcPort, &c.DstIP, &c.DstPort, &c.Protocol, &c.Status); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			results = append(results, c)
 		}
 		writeJSON(w, results)
 	}

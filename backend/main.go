@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"flag"
 	"fmt"
 	"log"
 	"monitoring-system/protocol"
@@ -13,6 +14,10 @@ import (
 const connStr = "host=localhost user=monitoring password=monitoring123 dbname=monitoring sslmode=require"
 
 func main() {
+	genOwner := flag.String("generate-key", "", "generate an API key for this owner name, then exit")
+	genRole := flag.String("role", "viewer", "role for the generated key: viewer or admin")
+	adminKey := flag.String("admin-key", "", "an existing admin key, required to generate new keys after the first")
+	flag.Parse()
 
 	//conectar a postgres
 	db, err := sql.Open("postgres", connStr)
@@ -32,6 +37,16 @@ func main() {
 	}
 	go startAPIServer(db)
 	fmt.Println("migrations OK")
+
+	if *genOwner != "" {
+		key, err := generateAPIKey(db, *genOwner, *genRole, *adminKey)
+		if err != nil {
+			log.Fatal("error generating key:", err)
+		}
+		fmt.Println("API key for", *genOwner, "(role:", *genRole, "):", key)
+		fmt.Println("Save this now — it will not be shown again.")
+		return
+	}
 
 	listener, err := net.Listen("tcp", ":2277")
 	if err != nil {
@@ -161,6 +176,14 @@ func runMigrations(db *sql.DB) error {
 			dst_port INTEGER NOT NULL,
 			protocol INTEGER NOT NULL,
 			status TEXT NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS api_keys (
+			id SERIAL PRIMARY KEY,
+			key_hash TEXT NOT NULL UNIQUE,
+			owner TEXT NOT NULL,
+			role TEXT NOT NULL DEFAULT 'viewer',
+			created_at BIGINT NOT NULL,
+			active BOOLEAN NOT NULL DEFAULT true
 		)`,
 		`CREATE TABLE IF NOT EXISTS alerts (
 			id SERIAL PRIMARY KEY,
